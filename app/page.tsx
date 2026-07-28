@@ -1,63 +1,156 @@
-import Image from "next/image";
+import { keygenApi, formatJsonApi } from '@/lib/api';
+import { revalidatePath } from 'next/cache';
+import { Trash2, Copy, Edit2 } from 'lucide-react'; // Instala lucide-react para los iconos
 
-export default function Home() {
+interface KeygenProduct {
+  id: string;
+  attributes: { name: string; created: string; };
+}
+
+interface KeygenPolicy {
+  id: string;
+  attributes: { name: string; maxMachines: number | null; strict: boolean; created: string; };
+}
+
+interface KeygenUser {
+  id: string;
+  attributes: { firstName: string | null; lastName: string | null; email: string; created: string; };
+}
+
+interface KeygenLicense {
+  id: string;
+  attributes: { key: string; status: string; expiry: string | null; created: string; };
+  relationships: {
+    policy: { data: { id: string } };
+    user: { data: { id: string } };
+  };
+}
+
+type Props = { searchParams?: Promise<{ view?: string }> };
+
+export default async function Dashboard(props: Props) {
+  const searchParams = await props.searchParams;
+  const currentView = searchParams?.view || 'products';
+
+  let products: KeygenProduct[] = [];
+  let policies: KeygenPolicy[] = [];
+  let users: KeygenUser[] = [];
+  let licenses: KeygenLicense[] = [];
+  let errorMessage = '';
+
+  try {
+    if (currentView === 'products') {
+      const res = await keygenApi.get('/products');
+      products = res.data.data;
+    } else if (currentView === 'policies') {
+      const [polRes, prodRes] = await Promise.all([keygenApi.get('/policies'), keygenApi.get('/products')]);
+      policies = polRes.data.data;
+      products = prodRes.data.data;
+    } else if (currentView === 'users') {
+      const res = await keygenApi.get('/users');
+      users = res.data.data;
+    } else if (currentView === 'licenses') {
+      const [licRes, polRes, usrRes] = await Promise.all([
+        keygenApi.get('/licenses'), keygenApi.get('/policies'), keygenApi.get('/users')
+      ]);
+      licenses = licRes.data.data;
+      policies = polRes.data.data;
+      users = usrRes.data.data;
+    }
+  } catch (error) {
+    console.error(`Error loading ${currentView}:`, error);
+    errorMessage = `Error de conexión: ${error instanceof Error ? error.message : 'Verifica tokens.'}`;
+  }
+
+  async function deleteResource(formData: FormData) {
+    'use server';
+    const type = formData.get('type') as string;
+    const id = formData.get('id') as string;
+    if (!type || !id) return;
+    try {
+      await keygenApi.delete(`/${type}s/${id}`);
+      revalidatePath('/?view=' + (type === 'policy' ? 'policies' : type + 's'));
+    } catch (e) { console.error("Delete Error", e); }
+  }
+
+  async function createProduct(formData: FormData) {
+    'use server';
+    const name = formData.get('name') as string;
+    if (!name) return;
+    await keygenApi.post('/products', formatJsonApi('product', { name: name.trim() }));
+    revalidatePath('/?view=products');
+  }
+
+  async function createPolicy(formData: FormData) {
+    'use server';
+    const name = formData.get('name') as string;
+    const maxMachines = parseInt(formData.get('maxMachines') as string) || 1;
+    const productId = formData.get('productId') as string;
+    await keygenApi.post('/policies', formatJsonApi('policy', { name: name.trim(), maxMachines, strict: true }, { product: { type: 'product', id: productId } }));
+    revalidatePath('/?view=policies');
+  }
+
+  async function createUser(formData: FormData) {
+    'use server';
+    const email = formData.get('email') as string;
+    await keygenApi.post('/users', formatJsonApi('user', { email: email.trim() }));
+    revalidatePath('/?view=users');
+  }
+
+  async function createLicense(formData: FormData) {
+    'use server';
+    const policyId = formData.get('policyId') as string;
+    const userId = formData.get('userId') as string;
+    await keygenApi.post('/licenses', formatJsonApi('license', {}, { policy: { type: 'policy', id: policyId }, user: { type: 'user', id: userId } }));
+    revalidatePath('/?view=licenses');
+  }
+
+  const titles: Record<string, string> = { products: '📦 Productos', policies: '📜 Políticas', users: '👥 Usuarios', licenses: '🔑 Licencias' };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
+      <aside className="w-full md:w-64 bg-gray-900 text-white flex flex-col border-r border-gray-800">
+        <div className="p-6 text-xl font-bold tracking-wider">KEYGEN<span className="text-blue-400">UI</span></div>
+        <nav className="flex-1 p-4 space-y-1">
+          {Object.entries(titles).map(([key, label]) => (
+            <a key={key} href={`?view=${key}`} className={`block px-4 py-3 rounded-lg ${currentView === key ? 'bg-blue-600' : 'hover:bg-gray-800'}`}>
+              {label}
+            </a>
+          ))}
+        </nav>
+      </aside>
+
+      <main className="flex-1 p-8">
+        <div className="max-w-6xl mx-auto">
+          {errorMessage && <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6">{errorMessage}</div>}
+          
+          {/* Listado con Acciones */}
+          <div className="bg-white rounded-xl shadow border p-6">
+            <h2 className="text-2xl font-bold mb-6">{titles[currentView]}</h2>
+            
+            <table className="w-full text-left">
+              <thead className="border-b"><tr><th className="p-4">Nombre / ID</th><th className="p-4">Acciones</th></tr></thead>
+              <tbody className="divide-y">
+                {currentView === 'products' && products.map(p => (
+                  <tr key={p.id}>
+                    <td className="p-4">{p.attributes.name} <span className="text-xs text-gray-400">({p.id})</span></td>
+                    <td className="p-4 flex gap-2">
+                      <form action={deleteResource}><input type="hidden" name="type" value="product"/><input type="hidden" name="id" value={p.id}/><button className="text-red-600"><Trash2 size={18}/></button></form>
+                    </td>
+                  </tr>
+                ))}
+                {currentView === 'licenses' && licenses.map(l => (
+                  <tr key={l.id}>
+                    <td className="p-4 font-mono text-green-700">{l.attributes.key}</td>
+                    <td className="p-4 flex gap-2">
+                       <button onClick={() => navigator.clipboard.writeText(l.attributes.key)} className="text-blue-600"><Copy size={18}/></button>
+                       <form action={deleteResource}><input type="hidden" name="type" value="license"/><input type="hidden" name="id" value={l.id}/><button className="text-red-600"><Trash2 size={18}/></button></form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
     </div>
