@@ -1,6 +1,7 @@
 import { keygenApi, formatJsonApi } from '@/lib/api';
 import { revalidatePath } from 'next/cache';
-import { Trash2, Copy, Edit2 } from 'lucide-react'; // Instala lucide-react para los iconos
+import { Trash2 } from 'lucide-react';
+import CopyButton from './components/CopyButton';
 
 interface KeygenProduct {
   id: string;
@@ -70,50 +71,34 @@ export default async function Dashboard(props: Props) {
     try {
       await keygenApi.delete(`/${type}s/${id}`);
       revalidatePath('/?view=' + (type === 'policy' ? 'policies' : type + 's'));
-    } catch (e) { console.error("Delete Error", e); }
+    } catch (e) { 
+      console.error("Delete Error", e); 
+    }
   }
 
-  async function createProduct(formData: FormData) {
-    'use server';
-    const name = formData.get('name') as string;
-    if (!name) return;
-    await keygenApi.post('/products', formatJsonApi('product', { name: name.trim() }));
-    revalidatePath('/?view=products');
-  }
-
-  async function createPolicy(formData: FormData) {
-    'use server';
-    const name = formData.get('name') as string;
-    const maxMachines = parseInt(formData.get('maxMachines') as string) || 1;
-    const productId = formData.get('productId') as string;
-    await keygenApi.post('/policies', formatJsonApi('policy', { name: name.trim(), maxMachines, strict: true }, { product: { type: 'product', id: productId } }));
-    revalidatePath('/?view=policies');
-  }
-
-  async function createUser(formData: FormData) {
-    'use server';
-    const email = formData.get('email') as string;
-    await keygenApi.post('/users', formatJsonApi('user', { email: email.trim() }));
-    revalidatePath('/?view=users');
-  }
-
-  async function createLicense(formData: FormData) {
-    'use server';
-    const policyId = formData.get('policyId') as string;
-    const userId = formData.get('userId') as string;
-    await keygenApi.post('/licenses', formatJsonApi('license', {}, { policy: { type: 'policy', id: policyId }, user: { type: 'user', id: userId } }));
-    revalidatePath('/?view=licenses');
-  }
-
-  const titles: Record<string, string> = { products: '📦 Productos', policies: '📜 Políticas', users: '👥 Usuarios', licenses: '🔑 Licencias' };
+  // Diccionario de títulos limpio y con emojis estándar
+  const titles: Record<string, string> = { 
+    products: '📦 Productos', 
+    policies: '📜 Políticas', 
+    users: '👥 Usuarios', 
+    licenses: '🔑 Licencias' 
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
-      <aside className="w-full md:w-64 bg-gray-900 text-white flex flex-col border-r border-gray-800">
-        <div className="p-6 text-xl font-bold tracking-wider">KEYGEN<span className="text-blue-400">UI</span></div>
-        <nav className="flex-1 p-4 space-y-1">
+    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row font-sans text-gray-900">
+      <aside className="w-full md:w-64 bg-gray-900 text-white flex flex-col border-r border-gray-800 shadow-lg">
+        <div className="p-6 text-xl font-bold tracking-wider border-b border-gray-800">
+          KEYGEN<span className="text-blue-400">UI</span>
+        </div>
+        <nav className="flex-1 p-4 space-y-2">
           {Object.entries(titles).map(([key, label]) => (
-            <a key={key} href={`?view=${key}`} className={`block px-4 py-3 rounded-lg ${currentView === key ? 'bg-blue-600' : 'hover:bg-gray-800'}`}>
+            <a 
+              key={key} 
+              href={`?view=${key}`} 
+              className={`block px-4 py-3 rounded-lg transition-colors font-medium ${
+                currentView === key ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
               {label}
             </a>
           ))}
@@ -122,34 +107,112 @@ export default async function Dashboard(props: Props) {
 
       <main className="flex-1 p-8">
         <div className="max-w-6xl mx-auto">
-          {errorMessage && <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6">{errorMessage}</div>}
+          {errorMessage && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded mb-6 shadow-sm">
+              <p className="font-bold">Error</p>
+              <p>{errorMessage}</p>
+            </div>
+          )}
           
-          {/* Listado con Acciones */}
-          <div className="bg-white rounded-xl shadow border p-6">
-            <h2 className="text-2xl font-bold mb-6">{titles[currentView]}</h2>
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b pb-4">{titles[currentView]}</h2>
             
-            <table className="w-full text-left">
-              <thead className="border-b"><tr><th className="p-4">Nombre / ID</th><th className="p-4">Acciones</th></tr></thead>
-              <tbody className="divide-y">
-                {currentView === 'products' && products.map(p => (
-                  <tr key={p.id}>
-                    <td className="p-4">{p.attributes.name} <span className="text-xs text-gray-400">({p.id})</span></td>
-                    <td className="p-4 flex gap-2">
-                      <form action={deleteResource}><input type="hidden" name="type" value="product"/><input type="hidden" name="id" value={p.id}/><button className="text-red-600"><Trash2 size={18}/></button></form>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50 border-y border-gray-200">
+                  <tr>
+                    <th className="p-4 font-semibold text-gray-700">Nombre / ID / Clave</th>
+                    <th className="p-4 font-semibold text-gray-700 w-32">Acciones</th>
                   </tr>
-                ))}
-                {currentView === 'licenses' && licenses.map(l => (
-                  <tr key={l.id}>
-                    <td className="p-4 font-mono text-green-700">{l.attributes.key}</td>
-                    <td className="p-4 flex gap-2">
-                       <button onClick={() => navigator.clipboard.writeText(l.attributes.key)} className="text-blue-600"><Copy size={18}/></button>
-                       <form action={deleteResource}><input type="hidden" name="type" value="license"/><input type="hidden" name="id" value={l.id}/><button className="text-red-600"><Trash2 size={18}/></button></form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  
+                  {/* Vista de PRODUCTOS */}
+                  {currentView === 'products' && products.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <span className="font-medium text-gray-900">{p.attributes.name}</span> <br/>
+                        <span className="text-xs text-gray-500 font-mono">{p.id}</span>
+                      </td>
+                      <td className="p-4">
+                        <form action={deleteResource}>
+                          <input type="hidden" name="type" value="product"/>
+                          <input type="hidden" name="id" value={p.id}/>
+                          <button className="text-red-600 hover:text-red-800 p-1"><Trash2 size={18}/></button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* Vista de POLÍTICAS (Faltaba en tu código) */}
+                  {currentView === 'policies' && policies.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <span className="font-medium text-gray-900">{p.attributes.name}</span> <br/>
+                        <span className="text-xs text-gray-500 font-mono">{p.id}</span>
+                      </td>
+                      <td className="p-4">
+                        <form action={deleteResource}>
+                          <input type="hidden" name="type" value="policy"/>
+                          <input type="hidden" name="id" value={p.id}/>
+                          <button className="text-red-600 hover:text-red-800 p-1"><Trash2 size={18}/></button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* Vista de USUARIOS (Faltaba en tu código) */}
+                  {currentView === 'users' && users.map(u => (
+                    <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <span className="font-medium text-gray-900">{u.attributes.email}</span> <br/>
+                        <span className="text-xs text-gray-500 font-mono">{u.id}</span>
+                      </td>
+                      <td className="p-4">
+                        <form action={deleteResource}>
+                          <input type="hidden" name="type" value="user"/>
+                          <input type="hidden" name="id" value={u.id}/>
+                          <button className="text-red-600 hover:text-red-800 p-1"><Trash2 size={18}/></button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* Vista de LICENCIAS */}
+                  {currentView === 'licenses' && licenses.map(l => (
+                    <tr key={l.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <span className="font-mono font-semibold text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
+                          {l.attributes.key}
+                        </span> <br/>
+                        <span className="text-xs text-gray-500 font-mono mt-2 inline-block">{l.id}</span>
+                      </td>
+                      <td className="p-4 flex gap-3 items-center mt-2">
+                         <CopyButton textToCopy={l.attributes.key} />
+                         <form action={deleteResource}>
+                           <input type="hidden" name="type" value="license"/>
+                           <input type="hidden" name="id" value={l.id}/>
+                           <button className="text-red-600 hover:text-red-800 p-1"><Trash2 size={18}/></button>
+                         </form>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {/* Mensaje si la tabla está vacía */}
+                  {((currentView === 'products' && products.length === 0) || 
+                    (currentView === 'policies' && policies.length === 0) || 
+                    (currentView === 'users' && users.length === 0) || 
+                    (currentView === 'licenses' && licenses.length === 0)) && (
+                    <tr>
+                      <td colSpan={2} className="p-8 text-center text-gray-500 italic">
+                        No hay registros para mostrar en esta vista.
+                      </td>
+                    </tr>
+                  )}
+
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </main>
