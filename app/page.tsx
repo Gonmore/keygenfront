@@ -6,12 +6,12 @@ import CopyButton from './components/CopyButton';
 
 interface KeygenProduct {
   id: string;
-  attributes: { name: string; created: string; };
+  attributes: { name: string; url: string | null; created: string; };
 }
 
 interface KeygenPolicy {
   id: string;
-  attributes: { name: string; maxMachines: number | null; strict: boolean; created: string; };
+  attributes: { name: string; maxMachines: number | null; duration: number | null; strict: boolean; floating: boolean; created: string; };
   relationships?: {
     product?: { data?: { id: string } };
   };
@@ -24,7 +24,7 @@ interface KeygenUser {
 
 interface KeygenLicense {
   id: string;
-  attributes: { key: string; status: string; expiry: string | null; created: string; };
+  attributes: { key: string; status: string; expiry: string | null; machinesCount: number; created: string; };
   relationships?: {
     policy?: { data?: { id: string } };
     user?: { data?: { id: string } };
@@ -94,9 +94,10 @@ export default async function Dashboard(props: Props) {
   async function createProduct(formData: FormData) {
     'use server';
     const name = formData.get('name') as string;
+    const url = formData.get('url') as string;
     if (!name) return;
     try {
-      await keygenApi.post('/products', formatJsonApi('product', { name: name.trim() }));
+      await keygenApi.post('/products', formatJsonApi('product', { name: name.trim(), url: url.trim() || null }));
     } catch (e) { console.error(e); }
     revalidatePath('/?view=products');
     redirect('/?view=products');
@@ -106,9 +107,13 @@ export default async function Dashboard(props: Props) {
     'use server';
     const name = formData.get('name') as string;
     const maxMachines = parseInt(formData.get('maxMachines') as string) || 1;
+    const durationDays = formData.get('durationDays') as string;
+    const duration = durationDays ? parseInt(durationDays) * 86400 : null;
+    const strict = formData.get('strict') === 'on';
+    const floating = formData.get('floating') === 'on';
     const productId = formData.get('productId') as string;
     try {
-      await keygenApi.post('/policies', formatJsonApi('policy', { name: name.trim(), maxMachines, strict: true }, { product: { type: 'product', id: productId } }));
+      await keygenApi.post('/policies', formatJsonApi('policy', { name: name.trim(), maxMachines, duration, strict, floating }, { product: { type: 'product', id: productId } }));
     } catch (e) { console.error(e); }
     revalidatePath('/?view=policies');
     redirect('/?view=policies');
@@ -128,8 +133,13 @@ export default async function Dashboard(props: Props) {
     'use server';
     const policyId = formData.get('policyId') as string;
     const userId = formData.get('userId') as string;
+    const expiry = formData.get('expiry') as string;
+    
+    const attrs: any = {};
+    if (expiry) attrs.expiry = new Date(expiry).toISOString();
+
     try {
-      await keygenApi.post('/licenses', formatJsonApi('license', {}, { policy: { type: 'policy', id: policyId }, user: { type: 'user', id: userId } }));
+      await keygenApi.post('/licenses', formatJsonApi('license', attrs, { policy: { type: 'policy', id: policyId }, user: { type: 'user', id: userId } }));
     } catch (e) { console.error(e); }
     revalidatePath('/?view=licenses');
     redirect('/?view=licenses');
@@ -139,9 +149,10 @@ export default async function Dashboard(props: Props) {
     'use server';
     const id = formData.get('id') as string;
     const name = formData.get('name') as string;
+    const url = formData.get('url') as string;
     if (!id || !name) return;
     try {
-      await keygenApi.patch(`/products/${id}`, formatJsonApi('product', { name: name.trim() }));
+      await keygenApi.patch(`/products/${id}`, formatJsonApi('product', { name: name.trim(), url: url.trim() || null }));
     } catch (e) { console.error(e); }
     revalidatePath('/?view=products');
     redirect('/?view=products');
@@ -152,9 +163,13 @@ export default async function Dashboard(props: Props) {
     const id = formData.get('id') as string;
     const name = formData.get('name') as string;
     const maxMachines = parseInt(formData.get('maxMachines') as string) || 1;
+    const durationDays = formData.get('durationDays') as string;
+    const duration = durationDays ? parseInt(durationDays) * 86400 : null;
+    const strict = formData.get('strict') === 'on';
+    const floating = formData.get('floating') === 'on';
     if (!id || !name) return;
     try {
-      await keygenApi.patch(`/policies/${id}`, formatJsonApi('policy', { name: name.trim(), maxMachines }));
+      await keygenApi.patch(`/policies/${id}`, formatJsonApi('policy', { name: name.trim(), maxMachines, duration, strict, floating }));
     } catch (e) { console.error(e); }
     revalidatePath('/?view=policies');
     redirect('/?view=policies');
@@ -177,13 +192,18 @@ export default async function Dashboard(props: Props) {
     const id = formData.get('id') as string;
     const policyId = formData.get('policyId') as string;
     const userId = formData.get('userId') as string;
+    const expiry = formData.get('expiry') as string;
+    
     if (!id) return;
     try {
       const relationships: Record<string, any> = {};
       if (policyId) relationships.policy = { type: 'policy', id: policyId };
       if (userId) relationships.user = { type: 'user', id: userId };
       
-      await keygenApi.patch(`/licenses/${id}`, formatJsonApi('license', {}, relationships));
+      const attrs: any = {};
+      if (expiry) attrs.expiry = new Date(expiry).toISOString();
+      
+      await keygenApi.patch(`/licenses/${id}`, formatJsonApi('license', attrs, relationships));
     } catch (e) { console.error(e); }
     revalidatePath('/?view=licenses');
     redirect('/?view=licenses');
@@ -275,6 +295,11 @@ export default async function Dashboard(props: Props) {
                       <td className="p-4">
                         <span className="font-medium text-gray-900">{p.attributes.name}</span> <br/>
                         <span className="text-xs text-gray-500 font-mono">{p.id}</span>
+                        {p.attributes.url && (
+                          <a href={p.attributes.url} target="_blank" rel="noreferrer" className="block text-xs text-blue-500 hover:underline mt-1">
+                            {p.attributes.url}
+                          </a>
+                        )}
                       </td>
                       <td className="p-4 flex gap-2 justify-end items-center">
                         <a 
@@ -296,6 +321,7 @@ export default async function Dashboard(props: Props) {
                   {/* Vista de POLÍTICAS */}
                   {currentView === 'policies' && policies.map(p => {
                     const linkedProduct = products.find(prod => prod.id === p.relationships?.product?.data?.id);
+                    const durationText = p.attributes.duration ? `${p.attributes.duration / 86400} días` : 'Perpetua';
                     return (
                       <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                         <td className="p-4">
@@ -306,7 +332,11 @@ export default async function Dashboard(props: Props) {
                             </span>
                           )}
                           <br/>
-                          <span className="text-xs text-gray-500 font-mono">{p.id} • Máx. Máquinas: {p.attributes.maxMachines || '∞'}</span>
+                          <span className="text-xs text-gray-500 font-mono">{p.id} • Máx. Máquinas: {p.attributes.maxMachines || '∞'} • {durationText}</span>
+                          <div className="mt-1 flex gap-2">
+                            {p.attributes.strict && <span className="text-[10px] uppercase font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Estricta</span>}
+                            {p.attributes.floating && <span className="text-[10px] uppercase font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Flotante</span>}
+                          </div>
                         </td>
                         <td className="p-4 flex gap-2 justify-end items-center">
                           <a 
@@ -393,13 +423,23 @@ export default async function Dashboard(props: Props) {
                           )}
                         </td>
                         <td className="p-4">
-                          <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${
-                            l.attributes.status === 'ACTIVE' 
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
-                            {l.attributes.status || 'ACTIVE'}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${
+                              l.attributes.status === 'ACTIVE' 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {l.attributes.status || 'ACTIVE'}
+                            </span>
+                            <span className="text-xs text-gray-500 font-medium">
+                              Uso: {l.attributes.machinesCount ?? 0} / {policy?.attributes.maxMachines || '∞'} máq.
+                            </span>
+                            {l.attributes.expiry && (
+                              <span className="text-[10px] text-gray-400">
+                                Vence: {new Date(l.attributes.expiry).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-4 flex gap-2 justify-end items-center">
                           <CopyButton textToCopy={l.attributes.key} />
@@ -469,22 +509,34 @@ export default async function Dashboard(props: Props) {
                 <div className="p-6 space-y-5">
                   {/* Formulario de Producto */}
                   {currentView === 'products' && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre del Producto</label>
-                      <input 
-                        type="text" 
-                        name="name" 
-                        defaultValue={editItem?.attributes?.name || ''} 
-                        required 
-                        className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900" 
-                        placeholder="Ej: Mi Aplicación v1.0" 
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre del Producto</label>
+                        <input 
+                          type="text" 
+                          name="name" 
+                          defaultValue={editItem?.attributes?.name || ''} 
+                          required 
+                          className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900" 
+                          placeholder="Ej: Mi Aplicación v1.0" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Sitio Web (URL Opcional)</label>
+                        <input 
+                          type="url" 
+                          name="url" 
+                          defaultValue={editItem?.attributes?.url || ''} 
+                          className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900" 
+                          placeholder="https://mi-aplicacion.com" 
+                        />
+                      </div>
                     </div>
                   )}
 
                   {/* Formulario de Política */}
                   {currentView === 'policies' && (
-                    <>
+                    <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre de la Política</label>
                         <input 
@@ -510,18 +562,41 @@ export default async function Dashboard(props: Props) {
                           </select>
                         </div>
                       )}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Límite de Máquinas</label>
-                        <input 
-                          type="number" 
-                          name="maxMachines" 
-                          defaultValue={editItem?.attributes?.maxMachines || 1} 
-                          min={1} 
-                          required 
-                          className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900" 
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Límite Máquinas</label>
+                          <input 
+                            type="number" 
+                            name="maxMachines" 
+                            defaultValue={editItem?.attributes?.maxMachines || 1} 
+                            min={1} 
+                            required 
+                            className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Duración (Días)</label>
+                          <input 
+                            type="number" 
+                            name="durationDays" 
+                            defaultValue={editItem?.attributes?.duration ? editItem.attributes.duration / 86400 : ''} 
+                            min={1} 
+                            className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900"
+                            placeholder="Vacío = Perpetua"
+                          />
+                        </div>
                       </div>
-                    </>
+                      <div className="flex gap-4 pt-2">
+                        <label className="flex items-center gap-2 text-sm text-gray-700 font-medium cursor-pointer">
+                          <input type="checkbox" name="strict" defaultChecked={editItem?.attributes?.strict !== false} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                          Modo Estricto
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 font-medium cursor-pointer">
+                          <input type="checkbox" name="floating" defaultChecked={editItem?.attributes?.floating === true} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                          Licencia Flotante
+                        </label>
+                      </div>
+                    </div>
                   )}
 
                   {/* Formulario de Usuario */}
@@ -541,7 +616,7 @@ export default async function Dashboard(props: Props) {
 
                   {/* Formulario de Licencia */}
                   {currentView === 'licenses' && (
-                    <>
+                    <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Usuario Propietario</label>
                         <select 
@@ -566,7 +641,17 @@ export default async function Dashboard(props: Props) {
                           {policies.map(p => <option key={p.id} value={p.id}>{p.attributes.name}</option>)}
                         </select>
                       </div>
-                    </>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Fecha de Vencimiento (Sobrescribir)</label>
+                        <input 
+                          type="datetime-local" 
+                          name="expiry" 
+                          defaultValue={editItem?.attributes?.expiry ? editItem.attributes.expiry.slice(0, 16) : ''} 
+                          className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm text-gray-900" 
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Déjalo en blanco para heredar la duración de la Política.</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 
