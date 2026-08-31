@@ -35,26 +35,43 @@ export async function verifyLicense(
   const trimmedId = licenseId.trim();
 
   try {
-    const [licRes, polRes, usrRes, prodRes] = await Promise.all([
-      keygenApi.get(`/licenses/${trimmedId}`),
-      keygenApi.get('/policies'),
-      keygenApi.get('/users'),
-      keygenApi.get('/products'),
-    ]);
-
+    const licRes = await keygenApi.get(`/licenses/${trimmedId}`);
     const license = licRes.data.data as KeygenResource;
-    const policies = polRes.data.data as KeygenResource[];
-    const users = usrRes.data.data as KeygenResource[];
-    const products = prodRes.data.data as KeygenResource[];
 
     const policyId = license.relationships?.policy?.data?.id;
     const userId = license.relationships?.user?.data?.id;
+    const productId = license.relationships?.product?.data?.id;
 
-    const policy = policyId ? policies.find((p) => p.id === policyId) : null;
-    const user = userId ? users.find((u) => u.id === userId) : null;
-    const product = policy ? products.find((prod) => prod.id === policy.relationships?.product?.data?.id) : null;
+    let policy: KeygenResource | null = null;
+    let user: KeygenResource | null = null;
+    let product: KeygenResource | null = null;
+    let p3AccountsAdded: number | null = null;
 
-     const result: LicenseVerificationResult = {
+    if (policyId) {
+      const polRes = await keygenApi.get(`/policies/${policyId}`);
+      policy = polRes.data.data as KeygenResource;
+
+      const metadata = policy.attributes.metadata as Record<string, unknown> | undefined;
+      p3AccountsAdded = metadata?.maxP3Accounts as number | null;
+
+      const productIdFromPolicy = policy.relationships?.product?.data?.id;
+      if (productIdFromPolicy) {
+        const prodRes = await keygenApi.get(`/products/${productIdFromPolicy}`);
+        product = prodRes.data.data as KeygenResource;
+      }
+    }
+
+    if (productId && !product) {
+      const prodRes = await keygenApi.get(`/products/${productId}`);
+      product = prodRes.data.data as KeygenResource;
+    }
+
+    if (userId) {
+      const usrRes = await keygenApi.get(`/users/${userId}`);
+      user = usrRes.data.data as KeygenResource;
+    }
+
+    const result: LicenseVerificationResult = {
       licenseId: license.id,
       key: license.attributes.key as string,
       status: (license.attributes.status as string) || 'ACTIVE',
@@ -68,7 +85,7 @@ export async function verifyLicense(
       policyFloating: (policy?.attributes?.floating as boolean) ?? false,
       productName: product?.attributes?.name as string | null,
       licenseName: (license.attributes.name as string) || null,
-      p3AccountsAdded: (policy?.attributes?.metadata as Record<string, unknown> | undefined)?.MaxP3Accounts as number | null,
+      p3AccountsAdded,
     };
 
     return { success: true, data: result };
