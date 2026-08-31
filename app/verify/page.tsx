@@ -12,7 +12,7 @@ export default function VerifyPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/">
+          <Link href="/verify">
             <img
               src="/web/Logo_Azul.png"
               alt="Supernovatel"

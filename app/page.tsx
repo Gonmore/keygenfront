@@ -228,8 +228,17 @@ export default async function Dashboard(props: Props) {
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row font-sans text-gray-900">
       {}
       <aside className="w-full md:w-64 bg-gray-900 text-white flex flex-col border-r border-gray-800 shadow-lg">
-        <div className="p-6 text-xl font-bold tracking-wider border-b border-gray-800">
-          KEYGEN<span className="text-blue-400">UI</span>
+        <div className="p-6 border-b border-gray-800 flex items-center justify-center">
+          <a href="/">
+            <img
+              src="/web/Logo_Blanco.png"
+              alt="Supernovatel"
+              width={140}
+              height={38}
+              className="cursor-pointer"
+              loading="eager"
+            />
+          </a>
         </div>
         <nav className="flex-1 p-4 space-y-2">
           {Object.entries(titles).map(([key, label]) => (
