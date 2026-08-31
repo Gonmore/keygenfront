@@ -68,7 +68,7 @@ export async function verifyLicense(
       policyFloating: (policy?.attributes?.floating as boolean) ?? false,
       productName: product?.attributes?.name as string | null,
       licenseName: (license.attributes.name as string) || null,
-      p3AccountsAdded: (product?.attributes?.metadata as Record<string, unknown> | undefined)?.MaxP3Accounts as number | null,
+      p3AccountsAdded: (policy?.attributes?.metadata as Record<string, unknown> | undefined)?.MaxP3Accounts as number | null,
     };
 
     return { success: true, data: result };
