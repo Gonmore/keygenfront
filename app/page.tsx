@@ -243,6 +243,12 @@ export default async function Dashboard(props: Props) {
               {label}
             </a>
           ))}
+          <a 
+            href="/verify" 
+            className="block px-4 py-3 rounded-lg transition-colors font-medium text-gray-300 hover:bg-gray-800 hover:text-white mt-4 border-t border-gray-800 pt-4"
+          >
+            🔍 Verificación Pública
+          </a>
         </nav>
       </aside>
 
