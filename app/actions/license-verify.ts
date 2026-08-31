@@ -21,6 +21,8 @@ export interface LicenseVerificationResult {
   policyStrict: boolean;
   policyFloating: boolean;
   productName: string | null;
+  licenseName: string | null;
+  p3AccountsAdded: number | null;
 }
 
 export async function verifyLicense(
@@ -52,7 +54,7 @@ export async function verifyLicense(
     const user = userId ? users.find((u) => u.id === userId) : null;
     const product = policy ? products.find((prod) => prod.id === policy.relationships?.product?.data?.id) : null;
 
-    const result: LicenseVerificationResult = {
+     const result: LicenseVerificationResult = {
       licenseId: license.id,
       key: license.attributes.key as string,
       status: (license.attributes.status as string) || 'ACTIVE',
@@ -65,6 +67,8 @@ export async function verifyLicense(
       policyStrict: (policy?.attributes?.strict as boolean) ?? false,
       policyFloating: (policy?.attributes?.floating as boolean) ?? false,
       productName: product?.attributes?.name as string | null,
+      licenseName: (license.attributes.name as string) || null,
+      p3AccountsAdded: (product?.attributes?.metadata as Record<string, unknown> | undefined)?.MaxP3Accounts as number | null,
     };
 
     return { success: true, data: result };

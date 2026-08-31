@@ -6,6 +6,7 @@ import {
   HardDrive,
   Calendar,
   Clock,
+  Tag,
 } from 'lucide-react';
 import { LicenseVerificationResult } from '@/app/actions/license-verify';
 
@@ -36,9 +37,6 @@ export default function LicenseResult({ data }: { data: LicenseVerificationResul
     }
   };
 
-  const maxMachinesText =
-    data.policyMaxMachines != null ? data.policyMaxMachines.toString() : '∞';
-
   const durationText = () => {
     if (!data.policyDuration) return 'Perpetua';
     const days = Math.round(data.policyDuration / 86400);
@@ -58,6 +56,16 @@ export default function LicenseResult({ data }: { data: LicenseVerificationResul
         </div>
 
         <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <Tag className="w-4 h-4 text-gray-400" />
+              Nombre
+            </span>
+            <span className="text-gray-800 font-medium">
+              {data.licenseName || 'Sin nombre'}
+            </span>
+          </div>
+
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <Activity className="w-4 h-4 text-gray-400" />
@@ -113,10 +121,10 @@ export default function LicenseResult({ data }: { data: LicenseVerificationResul
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <HardDrive className="w-4 h-4 text-gray-400" />
-              Máquinas registradas
+              Cuentas P3 agregadas
             </span>
             <span className="text-gray-800 font-medium">
-              {data.machinesCount} / {maxMachinesText}
+              {data.p3AccountsAdded != null ? data.p3AccountsAdded.toString() : 'Sin definir'}
             </span>
           </div>
 
