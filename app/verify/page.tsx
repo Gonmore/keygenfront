@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import LicenseSearch from "./LicenseSearch";
 
 export const metadata: Metadata = {
@@ -14,13 +13,13 @@ export default function VerifyPage() {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/">
-            <Image
-              src="/Logo_Azul.png"
+            <img
+              src="/web/Logo_Azul.png"
               alt="Supernovatel"
               width={160}
               height={44}
               className="cursor-pointer"
-              priority
+              loading="eager"
             />
           </Link>
           <nav>
